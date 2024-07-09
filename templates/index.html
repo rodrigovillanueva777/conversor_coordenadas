@@ -1,0 +1,223 @@
+# Version Corregida
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conversor de Coordenadas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 1000px;
+            width: 100%;
+        }
+        h1, h2 {
+            color: #1E90FF;
+        }
+        label {
+            color: #555;
+            display: block;
+            margin-top: 10px;
+        }
+        input, select {
+            background-color: #fff;
+            color: #333;
+            border: 1px solid #ccc;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 5px;
+            width: calc(100% - 12px);
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #1E90FF;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #104E8B;
+        }
+        .copy-button {
+            margin-left: 10px;
+            background-color: #555;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .copy-button:hover {
+            background-color: #333;
+        }
+        .map-button {
+            background-color: #32CD32; /* Verde */
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .map-button:hover {
+            background-color: #228B22; /* Verde más oscuro */
+        }
+        .result-container {
+            margin-top: 10px;
+            text-align: left;
+        }
+        .result-container div {
+            margin-bottom: 10px;
+        }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .column {
+            flex: 1;
+            margin: 0 5px;
+        }
+        .form-container {
+            margin: 0 auto;
+            max-width: 500px;
+        }
+        .search-container {
+            margin: 10px auto;
+            max-width: 500px;
+        }
+        .error-message {
+            color: red;
+        }
+    </style>
+    <script>
+        function copyToClipboard(elementId) {
+            var copyText = document.getElementById(elementId);
+            copyText.select();
+            document.execCommand("copy");
+        }
+
+        function setFocus() {
+            document.getElementById('easting').focus();
+        }
+
+        window.onload = setFocus;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Conversor de Coordenadas</h1>
+
+        <div class="search-container">
+            <form action="/search_zone" method="post">
+                <h2>Buscar Zona UTM por País</h2>
+                <label for="country">País:</label>
+                <select id="country" name="country">
+                    {% for country in utm_zones %}
+                        <option value="{{ country }}">{{ country }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Buscar</button>
+            </form>
+        </div>
+
+        <div class="form-container">
+            <div class="row">
+                <div class="column">
+                    <form action="/convert" method="post">
+                        <h2>UTM a Latitud/Longitud</h2>
+                        <label for="easting">X:</label>
+                        <input type="text" id="easting" name="easting" value="{{ request.form.get('easting', '') }}"><br>
+                        <label for="northing">Y:</label>
+                        <input type="text" id="northing" name="northing" value="{{ request.form.get('northing', '') }}"><br>
+                        <label for="zone_number">Número de Zona (1-60):</label>
+                        <input type="number" id="zone_number" name="zone_number" min="1" max="60" value="{{ request.form.get('zone_number', '') }}"><br>
+                        <label for="zone_letter">Letra de Zona (N/S):</label>
+                        <select id="zone_letter" name="zone_letter">
+                            <option value="N" {% if request.form.get('zone_letter') == 'N' %}selected{% endif %}>N</option>
+                            <option value="S" {% if request.form.get('zone_letter') == 'S' %}selected{% endif %}>S</option>
+                        </select><br>
+                        <input type="hidden" name="conversion_type" value="utm_to_latlon">
+                        <button type="submit">Convertir a Lat/Lon</button>
+                    </form>
+                </div>
+
+                <div class="column">
+                    <form action="/convert" method="post">
+                        <h2>Latitud/Longitud a UTM</h2>
+                        <label for="lat">Latitud:</label>
+                        <input type="text" id="lat" name="lat" value="{{ request.form.get('lat', '') }}"><br>
+                        <label for="lon">Longitud:</label>
+                        <input type="text" id="lon" name="lon" value="{{ request.form.get('lon', '') }}"><br>
+                        <input type="hidden" name="conversion_type" value="latlon_to_utm">
+                        <button type="submit">Convertir a UTM</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {% if result %}
+            <div class="result-container">
+                <div class="row">
+                    <div class="column">
+                        <h2>Resultado Decimal</h2>
+                        {% if 'Lat' in result and 'Lon' in result %}
+                            <div>
+                                <label>Latitud:</label>
+                                <input type="text" id="latResult" readonly value="{{ result.split(', ')[0].split(': ')[1] }}">
+                                <button class="copy-button" onclick="copyToClipboard('latResult')">Copiar</button>
+                            </div>
+                            <div>
+                                <label>Longitud:</label>
+                                <input type="text" id="lonResult" readonly value="{{ result.split(', ')[1].split(': ')[1] }}">
+                                <button class="copy-button" onclick="copyToClipboard('lonResult')">Copiar</button>
+                            </div>
+                            <div>
+                                <a href="{{ google_maps_link }}" target="_blank" class="map-button">Ver en Google Maps</a>
+                            </div>
+                        {% else %}
+                            <div>
+                                <label>Resultado:</label>
+                                <p>{{ result }}</p>
+                                <a href="{{ google_maps_link }}" target="_blank" class="map-button">Ver en Google Maps</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="column">
+                        <h2>Resultado DMS</h2>
+                        <div>
+                            <label>Latitud:</label>
+                            <input type="text" id="dmsLatResult" readonly value="{{ dms_lat }}">
+                            <button class="copy-button" onclick="copyToClipboard('dmsLatResult')">Copiar</button>
+                        </div>
+                        <div>
+                            <label>Longitud:</label>
+                            <input type="text" id="dmsLonResult" readonly value="{{ dms_lon }}">
+                            <button class="copy-button" onclick="copyToClipboard('dmsLonResult')">Copiar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if error_message %}
+            <div class="error-message">{{ error_message }}</div>
+        {% endif %}
+    </div>
+</body>
+</html>
