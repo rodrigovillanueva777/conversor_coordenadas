@@ -1,66 +1,85 @@
-#Version corregida
-from flask import Flask, render_template, request
+from flask import Flask, request, render_template
 import utm
+import re
 
 app = Flask(__name__)
 
-# UTM zones data (simplified example, add more countries as needed)
-utm_zones = {
-    'Paraguay': '21S',
-    'Brazil': '22S',
-    'Argentina': '21S',
-    'Chile': '19S',
-    'Uruguay': '21S',
-    'Puerto Rico': '20N',
-    # Add more countries and zones as needed
-}
+def dms_to_decimal(dms_str):
+    dms_str = re.sub(r'[^0-9NSEW.]+', ' ', dms_str).strip()
+    parts = dms_str.split(' ')
+    
+    if len(parts) != 4:
+        raise ValueError('DMS input should be in the format: 51°28\'40.12"N 0°0\'5.31"W')
+    
+    lat_d = float(parts[0])
+    lat_m = float(parts[1])
+    lat_s = float(parts[2])
+    lat_dir = parts[3]
+
+    lon_d = float(parts[4])
+    lon_m = float(parts[5])
+    lon_s = float(parts[6])
+    lon_dir = parts[7]
+
+    lat = lat_d + (lat_m / 60.0) + (lat_s / 3600.0)
+    if lat_dir == 'S':
+        lat = -lat
+
+    lon = lon_d + (lon_m / 60.0) + (lon_s / 3600.0)
+    if lon_dir == 'W':
+        lon = -lon
+
+    return lat, lon
 
 @app.route('/')
 def index():
-    return render_template('index.html', utm_zones=utm_zones.keys())
+    return render_template('index.html')
 
 @app.route('/convert', methods=['POST'])
 def convert():
-    conversion_type = request.form['conversion_type']
-    try:
-        if conversion_type == 'utm_to_latlon':
-            easting = float(request.form['easting'])
-            northing = float(request.form['northing'])
-            zone_number = int(request.form['zone_number'])
-            zone_letter = request.form['zone_letter'].upper()
+    result = ''
+    error_message = ''
+    google_maps_link = ''
+    lat = None
+    lon = None
+    dms_lat = request.form.get('dms_lat', '')
+    dms_lon = request.form.get('dms_lon', '')
+
+    if request.form.get('conversion_type') == 'utm_to_latlon':
+        try:
+            easting = float(request.form.get('easting'))
+            northing = float(request.form.get('northing'))
+            zone_number = int(request.form.get('zone_number'))
+            zone_letter = request.form.get('zone_letter')
+
             lat, lon = utm.to_latlon(easting, northing, zone_number, zone_letter)
-            result = f"Lat: {lat:.6f}°, Lon: {lon:.6f}°"
-            dms_lat = decimal_to_dms(lat, is_lat=True)
-            dms_lon = decimal_to_dms(lon, is_lat=False)
-            google_maps_link = f"https://www.google.com/maps?q={lat},{lon}"
-            return render_template('index.html', result=result, dms_lat=dms_lat, dms_lon=dms_lon, google_maps_link=google_maps_link, utm_zones=utm_zones.keys())
-        elif conversion_type == 'latlon_to_utm':
-            lat = float(request.form['lat'])
-            lon = float(request.form['lon'])
-            utm_coords = utm.from_latlon(lat, lon)
-            result = f"X: {utm_coords[0]}, Y: {utm_coords[1]}, Zona: {utm_coords[2]}{utm_coords[3]}"
-            return render_template('index.html', result=result, utm_zones=utm_zones.keys())
-    except Exception as e:
-        print(e)
-        error_message = "Datos incorrectos, vuelva a verificar."
-        return render_template('index.html', error_message=error_message, utm_zones=utm_zones.keys())
+            result = f'Lat: {lat}, Lon: {lon}'
+            google_maps_link = f'https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=18/{lat}/{lon}'
+        except Exception as e:
+            error_message = str(e)
+
+    elif request.form.get('conversion_type') == 'latlon_to_utm':
+        try:
+            if dms_lat and dms_lon:
+                lat, lon = dms_to_decimal(f"{dms_lat} {dms_lon}")
+            else:
+                lat = float(request.form.get('lat'))
+                lon = float(request.form.get('lon'))
+            
+            u = utm.from_latlon(lat, lon)
+            result = f'X: {u[0]}, Y: {u[1]}, Zone Number: {u[2]}, Zone Letter: {u[3]}'
+            google_maps_link = f'https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=18/{lat}/{lon}'
+        except Exception as e:
+            error_message = str(e)
+
+    return render_template('index.html', result=result, google_maps_link=google_maps_link, lat=lat, lon=lon, error_message=error_message)
 
 @app.route('/search_zone', methods=['POST'])
 def search_zone():
-    country = request.form['country']
-    zone = utm_zones.get(country, 'No disponible')
-    return render_template('index.html', search_result=f"Zona UTM para {country}: {zone}", utm_zones=utm_zones.keys(), country=country, zone=zone)
-
-def decimal_to_dms(decimal, is_lat):
-    degrees = int(decimal)
-    minutes_float = abs((decimal - degrees) * 60)
-    minutes = int(minutes_float)
-    seconds = (minutes_float - minutes) * 60
-    if is_lat:
-        direction = 'S' if decimal < 0 else 'N'
-    else:
-        direction = 'O' if decimal < 0 else 'E'
-    return f"{abs(degrees)}°{minutes}'{seconds:.2f}\"{direction}"
+    country = request.form.get('country')
+    # Aquí debes implementar la lógica para buscar la zona UTM basada en el país
+    # Por simplicidad, en este ejemplo, no se ha implementado esa lógica
+    return render_template('index.html', result=f'Zona UTM para {country}')
 
 if __name__ == '__main__':
     app.run(debug=True)

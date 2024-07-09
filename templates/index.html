@@ -1,8 +1,8 @@
-# Version Corregida
 <!DOCTYPE html>
 <html>
 <head>
     <title>Conversor de Coordenadas</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -17,14 +17,14 @@
         .container {
             text-align: center;
             background-color: #fff;
-            padding: 10px;
+            padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            max-width: 1000px;
+            max-width: 800px;
             width: 100%;
         }
         h1, h2 {
-            color: #1E90FF;
+            color: #005eff;
         }
         label {
             color: #555;
@@ -42,7 +42,7 @@
             box-sizing: border-box;
         }
         button {
-            background-color: #1E90FF;
+            background-color: #005eff;
             color: #fff;
             border: none;
             padding: 10px;
@@ -104,7 +104,13 @@
         .error-message {
             color: red;
         }
+        #map {
+            height: 400px;
+            width: 100%;
+            margin-top: 20px;
+        }
     </style>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
         function copyToClipboard(elementId) {
             var copyText = document.getElementById(elementId);
@@ -117,6 +123,19 @@
         }
 
         window.onload = setFocus;
+
+        function initMap(lat, lon) {
+            var map = L.map('map').setView([lat, lon], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            L.marker([lat, lon]).addTo(map)
+                .bindPopup('Ubicación')
+                .openPopup();
+        }
     </script>
 </head>
 <body>
@@ -164,6 +183,10 @@
                         <input type="text" id="lat" name="lat" value="{{ request.form.get('lat', '') }}"><br>
                         <label for="lon">Longitud:</label>
                         <input type="text" id="lon" name="lon" value="{{ request.form.get('lon', '') }}"><br>
+                        <label for="dms_lat">Latitud (DMS):</label>
+                        <input type="text" id="dms_lat" name="dms_lat" placeholder="Ej: 51°28'40.12"N"><br>
+                        <label for="dms_lon">Longitud (DMS):</label>
+                        <input type="text" id="dms_lon" name="dms_lon" placeholder="Ej: 0°0'5.31"W"><br>
                         <input type="hidden" name="conversion_type" value="latlon_to_utm">
                         <button type="submit">Convertir a UTM</button>
                     </form>
@@ -187,32 +210,22 @@
                                 <input type="text" id="lonResult" readonly value="{{ result.split(', ')[1].split(': ')[1] }}">
                                 <button class="copy-button" onclick="copyToClipboard('lonResult')">Copiar</button>
                             </div>
-                            <div>
-                                <a href="{{ google_maps_link }}" target="_blank" class="map-button">Ver en Google Maps</a>
-                            </div>
                         {% else %}
                             <div>
                                 <label>Resultado:</label>
                                 <p>{{ result }}</p>
-                                <a href="{{ google_maps_link }}" target="_blank" class="map-button">Ver en Google Maps</a>
                             </div>
                         {% endif %}
                     </div>
-                    <div class="column">
-                        <h2>Resultado DMS</h2>
-                        <div>
-                            <label>Latitud:</label>
-                            <input type="text" id="dmsLatResult" readonly value="{{ dms_lat }}">
-                            <button class="copy-button" onclick="copyToClipboard('dmsLatResult')">Copiar</button>
-                        </div>
-                        <div>
-                            <label>Longitud:</label>
-                            <input type="text" id="dmsLonResult" readonly value="{{ dms_lon }}">
-                            <button class="copy-button" onclick="copyToClipboard('dmsLonResult')">Copiar</button>
-                        </div>
-                    </div>
                 </div>
             </div>
+        {% endif %}
+
+        {% if lat and lon %}
+        <div id="map"></div>
+        <script>
+            initMap({{ lat }}, {{ lon }});
+        </script>
         {% endif %}
 
         {% if error_message %}
